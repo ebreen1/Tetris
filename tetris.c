@@ -184,7 +184,7 @@ void lockPiece(struct field *f){
 		SDL_Log("Game Over\n");
 		return;
 	}
-	SDL_Log("Locking piece\n");
+	
 	for(int y = 0; y < f->currentPiece.size; y++){
 		for(int x = 0; x < f->currentPiece.size; x++){
 			if(f->currentPiece.cells[y * f->currentPiece.size + x]){
@@ -250,6 +250,16 @@ bool movePiece(struct field *f, int x, int y){
 	}
 
 	return true;
+}
+
+void hardDrop(struct field *f){
+	// Move piece down until it can't anymore
+	while(movePiece(f, 0, 1))
+		;
+
+	lockPiece(f);
+	spawnPiece(f, rand() % 7);
+	f->lastDrop = SDL_GetTicks();
 }
 
 bool rotatePiece(struct field *f, bool clockwise){

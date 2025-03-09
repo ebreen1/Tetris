@@ -87,10 +87,18 @@ SDL_AppResult SDL_AppEvent(void *appstate, SDL_Event *event){
 			movePiece(playField, 1, 0);
 			break;
 		case SDL_SCANCODE_UP:
+			// Rotate piece clockwise
 			rotatePiece(playField, true);
 			break;
 		case SDL_SCANCODE_DOWN:
 			movePiece(playField, 0, 1);
+			break;
+		case SDL_SCANCODE_SPACE:
+			hardDrop(playField);
+			break;
+		case SDL_SCANCODE_Z:
+			// Rotate piece counter-clockwise
+			rotatePiece(playField, false);
 			break;
 		}
 	}

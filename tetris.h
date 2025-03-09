@@ -44,3 +44,4 @@ void spawnPiece(struct field *f, enum PieceType p);
 void updateField(struct field *f);
 bool movePiece(struct field *f, int x, int y);
 bool rotatePiece(struct field *f, bool clockwise);
+void hardDrop(struct field *f);
