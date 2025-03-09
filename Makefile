@@ -1,2 +1,2 @@
 all:
-	g++ main.cpp -o tetris -lSDL3
+	gcc main.c tetris.c -lSDL3
