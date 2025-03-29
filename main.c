@@ -1,5 +1,7 @@
 #include "tetris.h"
 #include <SDL3/SDL.h>
+#include <time.h>
+#include <stdlib.h>
 
 #define SDL_MAIN_USE_CALLBACKS
 #include <SDL3/SDL_main.h>
@@ -21,9 +23,6 @@ SDL_Renderer *renderer = NULL;
 
 /*
 TODO (in rough order of priority)
- - more controls
-   - counter-clockwise rotate
-   - hard drop
  - 'random bag' generation
  - wall kicks
  - score
@@ -39,6 +38,7 @@ void logError(const char *msg){
 
 
 SDL_AppResult SDL_AppInit(void **appstate, int argc, char **argv){
+	srand(time(0));
 	if(!SDL_SetAppMetadata("SDL3 Tetris", NULL, "tetris.sdl")){
 		logError("SDL_SetAppMetadata");
 		return SDL_APP_FAILURE;
@@ -81,17 +81,17 @@ SDL_AppResult SDL_AppEvent(void *appstate, SDL_Event *event){
 	else if(event->type == SDL_EVENT_KEY_DOWN){
 		switch(event->key.scancode){
 		case SDL_SCANCODE_LEFT:
-			movePiece(playField, -1, 0);
+			shiftPiece(playField, -1);
 			break;
 		case SDL_SCANCODE_RIGHT:
-			movePiece(playField, 1, 0);
+			shiftPiece(playField, 1);
 			break;
 		case SDL_SCANCODE_UP:
 			// Rotate piece clockwise
 			rotatePiece(playField, true);
 			break;
 		case SDL_SCANCODE_DOWN:
-			movePiece(playField, 0, 1);
+			moveDown(playField);
 			break;
 		case SDL_SCANCODE_SPACE:
 			hardDrop(playField);

@@ -3,9 +3,19 @@
 #include <stdlib.h>
 #include <SDL3/SDL.h>
 
+SDL_Color colors[] = {
+	{ 0x00, 0x00, 0x00, 0x00 }, // Empty cell - black
+	{ 0x00, 0xE6, 0xFE, 0xFF },	// I - light blue
+	{ 0x18, 0x01, 0xFF, 0xFF },	// J - blue
+	{ 0xFF, 0x73, 0x08, 0xFF }, // L - orange
+	{ 0xFF, 0xFF, 0x00, 0xFF }, // O - yellow
+	{ 0x00, 0xFF, 0x00, 0xFF }, // S - green
+	{ 0xFF, 0x00, 0x08, 0xFF }, // Z - red
+	{ 0xFF, 0x00, 0xFF, 0xFF }, // T - purple
+};
+
 const struct tetromino I = {
 	size: 4,
-	color: { 0, 0xE6, 0xFE, 0xFF },
 	cells: {
 		0, 0, 0, 0,
 		1, 1, 1, 1,
@@ -16,7 +26,6 @@ const struct tetromino I = {
 
 const struct tetromino J = {
 	size: 3,
-	color: { 0x18, 0x01, 0xFF, 0xFF },
 	cells: {
 		1, 0, 0,
 		1, 1, 1,
@@ -26,7 +35,6 @@ const struct tetromino J = {
 
 const struct tetromino L = { 
 	size: 3,
-	color: { 0xFF, 0x73, 0x08, 0xFF },
 	cells: {
 		0, 0, 1,
 		1, 1, 1,
@@ -36,7 +44,6 @@ const struct tetromino L = {
 
 const struct tetromino O = { 
 	size: 2,
-	color: { 0xFF, 0xFF, 0x00, 0xFF },
 	cells: {
 		1, 1,
 		1, 1
@@ -45,7 +52,6 @@ const struct tetromino O = {
 
 const struct tetromino S = { 
 	size: 3,
-	color: { 0x00, 0xFF, 0x00, 0xFF },
 	cells: {
 		0, 1, 1,
 		1, 1, 0,
@@ -55,7 +61,6 @@ const struct tetromino S = {
 
 const struct tetromino Z = { 
 	size: 3,
-	color: { 0xFF, 0x00, 0x08, 0xFF },
 	cells: {
 		1, 1, 0,
 		0, 1, 1,
@@ -65,13 +70,14 @@ const struct tetromino Z = {
 
 const struct tetromino T = { 
 	size: 3,
-	color: { 0xFF, 0x00, 0xFF, 0xFF },
 	cells: {
 		0, 1, 0,
 		1, 1, 1,
 		0, 0, 0
 	}
 };
+
+int getLandingY(struct field *f);
 
 static void renderCell(SDL_Renderer *renderer, int x, int y, int cellSize, SDL_Color color){
 	SDL_SetRenderDrawColor(renderer, color.r, color.g, color.b, color.a);
@@ -84,6 +90,18 @@ static void renderCell(SDL_Renderer *renderer, int x, int y, int cellSize, SDL_C
 	SDL_RenderRect(renderer, &dest);
 }
 
+static void renderSilhouetteCell(SDL_Renderer *renderer, int x, int y, int cellSize, SDL_Color color){
+	SDL_SetRenderDrawColor(renderer, color.r, color.g, color.b, color.a);
+
+	SDL_FRect dest = { x * cellSize, y * cellSize, cellSize, cellSize };
+
+	SDL_SetRenderDrawColor(renderer, color.r * 0.6, color.g * 0.6, color.b * 0.6, color.a * 0.6);
+	SDL_RenderFillRect(renderer, &dest);
+
+	SDL_SetRenderDrawColor(renderer, color.r * 0.4, color.g * 0.4, color.b * 0.4, color.a * 0.6);
+	SDL_RenderRect(renderer, &dest);
+}
+
 struct field *createField(size_t width, size_t height, size_t cellSize, unsigned int dropTime){
 	struct field *f = malloc(sizeof(*f) + sizeof(*f->cells) * width * height);
 
@@ -92,7 +110,7 @@ struct field *createField(size_t width, size_t height, size_t cellSize, unsigned
 	f->cellSize = cellSize;
 	f->dropTime = dropTime;
 
-	spawnPiece(f, L_PIECE);
+	spawnRandom(f);
 
 	memset(f->cells, 0, sizeof(*f->cells) * width * height);
 
@@ -100,16 +118,30 @@ struct field *createField(size_t width, size_t height, size_t cellSize, unsigned
 }
 
 void renderField(SDL_Renderer *renderer, struct field *f){
+
+	// Render the field itself (not including the currently active piece)
 	for(int y = 0; y < f->height; y++){
 		for(int x = 0; x < f->width; x++){
-			renderCell(renderer, x, y, f->cellSize, f->cells[y * f->width + x]);
+			renderCell(renderer, x, y, f->cellSize, colors[f->cells[y * f->width + x]]);
 		}
 	}
 
+	//Render the silhouette of where the current piece will land
+	int silhouetteY = getLandingY(f);
 	for(int y = 0; y < f->currentPiece.size; y++){
 		for(int x = 0; x < f->currentPiece.size; x++){
 			if(f->currentPiece.cells[f->currentPiece.size * y + x]){
-				renderCell(renderer, f->pieceX + x, f->pieceY + y, f->cellSize, f->currentPiece.color);
+				renderSilhouetteCell(renderer, f->pieceX + x, silhouetteY + y, f->cellSize, colors[f->currentPiece.type]);
+			}
+		}
+	}
+
+
+	// Render the current piece
+	for(int y = 0; y < f->currentPiece.size; y++){
+		for(int x = 0; x < f->currentPiece.size; x++){
+			if(f->currentPiece.cells[f->currentPiece.size * y + x]){
+				renderCell(renderer, f->pieceX + x, f->pieceY + y, f->cellSize, colors[f->currentPiece.type]);
 			}
 		}
 	}
@@ -123,7 +155,7 @@ void checkLines(struct field *f){
 	for(int y = 0; y < f->height; y++){
 		bool lineFull = true;
 		for(int x = 0; x < f->width; x++){
-			if(!f->cells[f->width*y + x].a){
+			if(!colors[f->cells[f->width*y + x]].a){
 				lineFull = false;
 				break;
 			}
@@ -133,14 +165,14 @@ void checkLines(struct field *f){
 			continue;
 		}
 
-		SDL_Log("Clearing line %d\n", y);
+		// SDL_Log("Clearing line %d\n", y);
 		// If the line is filled, clear it
 		for(int x = 0; x < f->width; x++){
-			f->cells[f->width * y + x].a = 0;
+			f->cells[f->width * y + x] = EMPTY;
 		}
 
 		// The lines above the one cleared move down
-		for(int row = y-1; row >= 0; row--){
+		for(int row = y-1; row >= -2; row--){
 			for(int x = 0; x < f->width; x++){
 				f->cells[ (row+1)*f->width + x ] = f->cells[ row*f->width + x ];
 			}
@@ -148,6 +180,11 @@ void checkLines(struct field *f){
 	}
 }
 
+
+// Spawns a random piece
+void spawnRandom(struct field *f){
+	spawnPiece(f, rand() % 7 + 1);
+}
 
 void spawnPiece(struct field *f, enum PieceType p){
 	switch(p){
@@ -174,7 +211,9 @@ void spawnPiece(struct field *f, enum PieceType p){
 		break;
 	}
 
-	f->pieceX = 0;
+	f->currentPiece.type = p;
+
+	f->pieceX = (f->width - f->currentPiece.size) / 2;
 	f->pieceY = -2;
 	f->lastDrop = SDL_GetTicks();
 }
@@ -190,76 +229,112 @@ void lockPiece(struct field *f){
 			if(f->currentPiece.cells[y * f->currentPiece.size + x]){
 				int fieldX = x + f->pieceX;
 				int fieldY = y + f->pieceY;
-				f->cells[ fieldY * f->width + fieldX ] = f->currentPiece.color;
+				f->cells[ fieldY * f->width + fieldX ] = f->currentPiece.type;
 			}
 		}
 	}
 
 	checkLines(f);
+
+	spawnRandom(f);
 }
 
 void updateField(struct field *f){
 	unsigned int currentTime = SDL_GetTicks();
 
 	if(currentTime - f->lastDrop > f->dropTime){
-		if(!movePiece(f, 0, 1)){
-			lockPiece(f);
-			spawnPiece(f, rand() % 7);
-		}
+		moveDown(f);
 		f->lastDrop = currentTime;
 	}
 }
 
-bool checkCollision(struct field *f){
+// Returns true if there will be a collision if the piece is moved by dx cells horizontally and dy cells vertically,
+bool checkCollision(struct field *f, int dx, int dy){
 	for(int y = 0; y < f->currentPiece.size; y++){
 		for(int x = 0; x < f->currentPiece.size; x++){
 			if(f->currentPiece.cells[y * f->currentPiece.size + x]){
-				int fieldX = x + f->pieceX;
-				int fieldY = y + f->pieceY;
-				if(fieldY >= 0 && f->cells[ fieldY * f->width + fieldX ].a){
-					//SDL_Log("Collision with cell on field\n");
+				int fieldX = x + f->pieceX + dx;
+				int fieldY = y + f->pieceY + dy;
+				if(fieldY >= 0 && f->cells[ fieldY * f->width + fieldX ] != EMPTY){
+					// Collision with a non-empty cell on the field
 					return true;
 				}
 				if(fieldX < 0 ){
-					//SDL_Log("Collision with left edge\n");
+					// Collision with the left edge of the field
 					return true;
 				}
 				if(fieldX >= f->width){
-					//SDL_Log("Collision with right edge\n");
+					// Collision with the right edge of the field
 					return true;
 				}
 				if(fieldY >= f->height){
-					//SDL_Log("Collision with bottom edge\n");
-					//SDL_Log("field coords: %d, %d\n", fieldX, fieldY);
+					//Collision with the bottom edge of the field
 					return true;
 				}
 			}
 		}
 	}
+
+	// No collision
 	return false;
 }
 
-bool movePiece(struct field *f, int x, int y){
-	f->pieceX += x;
-	f->pieceY += y;
-
-	if(checkCollision(f)){
-		f->pieceX -= x;
-		f->pieceY -= y;
+// Shifts the current piece left (negative x) or right (positive x) if possible
+// Returns true if piece was successfully shifted, false if not
+bool shiftPiece(struct field *f, int x){
+	// If shifting the piece would cause a collision, don't shift it and return false
+	if(checkCollision(f, x, 0)){
 		return false;
 	}
+
+	// If there will not be a collision, shift the piece and return true
+	f->pieceX += x;
 
 	return true;
 }
 
-void hardDrop(struct field *f){
-	// Move piece down until it can't anymore
-	while(movePiece(f, 0, 1))
-		;
 
-	lockPiece(f);
-	spawnPiece(f, rand() % 7);
+// Moves the current piece down if possible
+// Returns true if piece was successfully shifted, false if not
+bool moveDown(struct field *f){
+	// Set lastDrop to current time to reset counter until next drop
 	f->lastDrop = SDL_GetTicks();
+
+	// If moving the piece down would cause a collision, lock it into the field, spawning a new piece, and return false
+	if(checkCollision(f, 0, 1)){
+		lockPiece(f);
+		return false;
+	}
+
+	// If there will not be a collision, move the piece down and return true
+	f->pieceY += 1;
+
+	return true;
+}
+
+// Returns the y coordinate that the current piece will land if not shifted
+// Used for showing the silhouette of where the piece will land
+int getLandingY(struct field *f){
+	int dy = 0;
+
+	while(!checkCollision(f, 0, dy)){
+		dy++;
+	}
+
+	// pieceY + dy is where collision occurs, so return last y value with no collision
+	return f->pieceY + dy - 1;
+}
+
+// Drops the piece as far as it can go and locks it in
+// Returns how many spaces down it moved
+int hardDrop(struct field *f){
+	int count = 0;
+	// Move piece down until it can't anymore
+	while(moveDown(f)){
+		count++;
+	}
+
+	return count;
 }
 
 bool rotatePiece(struct field *f, bool clockwise){
@@ -277,7 +352,7 @@ bool rotatePiece(struct field *f, bool clockwise){
 		}
 	}
 
-	if(checkCollision(f)){
+	if(checkCollision(f, 0, 0)){
 		f->currentPiece = oldPiece;
 	}
 }

@@ -5,6 +5,7 @@
 #define MAX_SIZE 4
 
 enum PieceType {
+	EMPTY,
 	I_PIECE,
 	J_PIECE,
 	L_PIECE,
@@ -14,10 +15,11 @@ enum PieceType {
 	T_PIECE
 };
 
+
 struct tetromino {
 	size_t size;
-	SDL_Color color;
 	char cells[MAX_SIZE * MAX_SIZE];
+	enum PieceType type;
 };
 
 struct field {
@@ -32,16 +34,18 @@ struct field {
 	int pieceY;
 
 	struct tetromino currentPiece;
-	SDL_Color buffer[100];
-	SDL_Color cells[];
+	enum PieceType buffer[100];
+	enum PieceType cells[];
 };
 
 struct field *createField(size_t width, size_t height, size_t cellSize, unsigned int dropTime);
 void renderField(SDL_Renderer *renderer, struct field *f);
 void destroyField(struct field *f);
 
+void spawnRandom(struct field *f);
 void spawnPiece(struct field *f, enum PieceType p);
 void updateField(struct field *f);
-bool movePiece(struct field *f, int x, int y);
+bool shiftPiece(struct field *f, int x);
+bool moveDown(struct field *f);
 bool rotatePiece(struct field *f, bool clockwise);
-void hardDrop(struct field *f);
+int hardDrop(struct field *f);
