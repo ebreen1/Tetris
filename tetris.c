@@ -12,6 +12,7 @@ SDL_Color colors[] = {
 	{ 0x00, 0xFF, 0x00, 0xFF }, // S - green
 	{ 0xFF, 0x00, 0x08, 0xFF }, // Z - red
 	{ 0xFF, 0x00, 0xFF, 0xFF }, // T - purple
+	{ 0xFF, 0xFF, 0xFF, 0xFF }, // Line clear - white
 };
 
 const struct tetromino I = {
@@ -102,13 +103,16 @@ static void renderSilhouetteCell(SDL_Renderer *renderer, int x, int y, int cellS
 	SDL_RenderRect(renderer, &dest);
 }
 
-struct field *createField(size_t width, size_t height, size_t cellSize, unsigned int dropTime){
+struct field *createField(size_t width, size_t height, size_t cellSize, unsigned int dropTime, int clearDuration){
 	struct field *f = malloc(sizeof(*f) + sizeof(*f->cells) * width * height);
 
 	f->width = width;
 	f->height = height;
 	f->cellSize = cellSize;
 	f->dropTime = dropTime;
+	f->lineClearDuration = clearDuration;
+
+	f->score = 0;
 
 	spawnRandom(f);
 
@@ -152,10 +156,11 @@ void destroyField(struct field *f){
 }
 
 void checkLines(struct field *f){
+	int linesCleared = 0;
 	for(int y = 0; y < f->height; y++){
 		bool lineFull = true;
 		for(int x = 0; x < f->width; x++){
-			if(!colors[f->cells[f->width*y + x]].a){
+			if(f->cells[f->width*y + x] == EMPTY){
 				lineFull = false;
 				break;
 			}
@@ -165,16 +170,54 @@ void checkLines(struct field *f){
 			continue;
 		}
 
+		linesCleared++;
+
 		// SDL_Log("Clearing line %d\n", y);
 		// If the line is filled, clear it
 		for(int x = 0; x < f->width; x++){
-			f->cells[f->width * y + x] = EMPTY;
+			f->cells[f->width * y + x] = LINE_CLEAR;
+		}
+	}
+
+	if(linesCleared > 0){
+		f->lineCleared = true;
+		f->lastDrop += f->lineClearDuration;
+		f->lineClearTime = SDL_GetTicks();
+
+		// Points for clearing lines
+		switch(linesCleared){
+		case 1:
+			f->score += 100;
+			break;
+		case 2:
+			f->score += 300;
+			break;
+		case 3:
+			f->score += 500;
+			break;
+		case 4:
+			f->score += 800;
+			break;
 		}
 
-		// The lines above the one cleared move down
-		for(int row = y-1; row >= -2; row--){
+		SDL_Log("Score: %d\n", f->score);
+	}
+}
+
+// Clears lines marked with LINE_CLEAR
+void clearLines(struct field *f){
+	for(int y = 0; y < f->height; y++){
+		// If a line was cleared, all of its cells would be LINE_CLEAR, so just check the first one
+		if(f->cells[f->width * y] == LINE_CLEAR){
+			// Set cells in cleared line to EMPTY
 			for(int x = 0; x < f->width; x++){
-				f->cells[ (row+1)*f->width + x ] = f->cells[ row*f->width + x ];
+				f->cells[f->width * y + x] = EMPTY;
+			}
+
+			for(int row = y-1; row >= -2; row--){
+				for(int x = 0; x < f->width; x++){
+					f->cells[ (row+1)*f->width + x ] = f->cells[ row*f->width + x ];
+				}
 			}
 		}
 	}
@@ -241,6 +284,16 @@ void lockPiece(struct field *f){
 
 void updateField(struct field *f){
 	unsigned int currentTime = SDL_GetTicks();
+
+	if(f->lineCleared){
+		if(currentTime - f->lineClearTime > f->lineClearDuration){
+			clearLines(f);
+			f->lineCleared = false;
+		}
+		else{
+			return;
+		}
+	}
 
 	if(currentTime - f->lastDrop > f->dropTime){
 		moveDown(f);

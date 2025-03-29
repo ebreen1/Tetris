@@ -12,7 +12,8 @@ enum PieceType {
 	O_PIECE,
 	S_PIECE,
 	Z_PIECE,
-	T_PIECE
+	T_PIECE,
+	LINE_CLEAR
 };
 
 
@@ -30,6 +31,12 @@ struct field {
 	int dropTime;
 	int lastDrop;
 
+	int lineClearTime;
+	int lineClearDuration;
+	bool lineCleared;
+
+	int score;
+
 	int pieceX;
 	int pieceY;
 
@@ -38,7 +45,7 @@ struct field {
 	enum PieceType cells[];
 };
 
-struct field *createField(size_t width, size_t height, size_t cellSize, unsigned int dropTime);
+struct field *createField(size_t width, size_t height, size_t cellSize, unsigned int dropTime, int clearDuration);
 void renderField(SDL_Renderer *renderer, struct field *f);
 void destroyField(struct field *f);
 

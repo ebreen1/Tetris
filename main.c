@@ -7,6 +7,7 @@
 #include <SDL3/SDL_main.h>
 
 #define DROP_TIME 1000
+#define LINE_CLEAR_TIME 500
 
 struct field *playField = NULL;
 
@@ -28,7 +29,6 @@ TODO (in rough order of priority)
  - score
  - hold
  - piece preview
-
 */
 
 
@@ -56,7 +56,7 @@ SDL_AppResult SDL_AppInit(void **appstate, int argc, char **argv){
 
 	SDL_SetRenderScale(renderer, SCALE, SCALE);
 
-	playField = createField(FIELD_WIDTH, FIELD_HEIGHT, CELL_SIZE, DROP_TIME);
+	playField = createField(FIELD_WIDTH, FIELD_HEIGHT, CELL_SIZE, DROP_TIME, LINE_CLEAR_TIME);
 
 	return SDL_APP_CONTINUE;
 }
